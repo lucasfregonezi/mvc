@@ -4,6 +4,7 @@ namespace App\Http;
 
 use Closure;
 use Exception;
+use ReflectionFunction;
 
 class Router
 {
@@ -37,6 +38,17 @@ class Router
                 unset($params[$key]);
                 continue;
             }
+        }
+
+        //VARIAVEIS DA ROTA
+        $params['variables'] = [];
+
+        //PADRAO DE VALIDAÇÃO DAS VARIAVEIS DAS ROTAS
+        $patterVariable = '/{(.*?)}/';
+
+        if(preg_match_all($patterVariable, $route, $matches)) {
+            $route = preg_replace($patterVariable, '(.*?)', $route);
+            $params['variables'] = $matches[1];
         }
 
         $patternRoute = '/^' . str_replace('/', '\/', $route) . '$/';
@@ -82,8 +94,13 @@ class Router
         $httpMethod = $this->request->getHttpMethod();
 
         foreach($this->routes as $patternRoute=>$methods) {
-            if(preg_match($patternRoute, $uri)) {
-                if($methods[$httpMethod]) {
+            if(preg_match($patternRoute, $uri, $matches)) {
+                if(isset($methods[$httpMethod])) {
+                    unset($matches[0]);
+                    $keys = $methods[$httpMethod]['variables'];
+                    $methods[$httpMethod]['variables'] = array_combine($keys, $matches);
+                    $methods[$httpMethod]['variables']['request'] = $this->request;
+
                     return $methods[$httpMethod];
                 }
 
@@ -99,11 +116,19 @@ class Router
         try {
 
             $route = $this->getRoute();
+
             if(!isset($route['controller'])) {
                 throw new Exception("URL não pode ser processada", 500);
             }
 
             $args = [];
+
+            $reflection = new ReflectionFunction($route['controller']);
+            foreach ($reflection->getParameters() as $parameter) {
+                $name = $parameter->getName();
+                $args[$name] = $route['variables'][$name] ?? '';
+            }
+
             return call_user_func_array($route['controller'], $args);
 
         } catch (Exception $e) {

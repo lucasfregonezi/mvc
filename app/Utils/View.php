@@ -4,6 +4,13 @@ namespace App\Utils;
 
 class View
 {
+    private static array $vars = [];
+
+    public static function init(array $vars = [])
+    {
+        self::$vars = $vars;
+    }
+
     private static function getContentView(string $view): string
     {
         $file = __DIR__.'/../../resources/view/' . $view . '.html';
@@ -14,8 +21,9 @@ class View
     {
         $contentView = self::getContentView($view);
 
-        $keys = array_keys($vars);
+        $vars = array_merge(self::$vars, $vars);
 
+        $keys = array_keys($vars);
         $keys = array_map(function ($item) {
             return '{{'.$item.'}}';
         }, $keys);
